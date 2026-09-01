@@ -24,6 +24,16 @@ If a requested change would alter an established security, privacy, or architect
 - Distinguish confirmed repository behavior from proposed behavior.
 - Do not invent missing extraction rules, business rules, grouping logic, or financial policy.
 - Any rule not already documented must be treated as unresolved unless explicitly decided by the user or by a documented ADR.
+- When a task depends on a named version, branch, tag, commit, or release, verify that exact revision from direct repository evidence before using it as an evidence source.
+- After a reference revision is identified, inspect source content from that exact revision. Do not substitute the current working tree, another branch, or prior conversational context for revision-specific evidence.
+- If the required revision cannot be accessed or verified, stop the assessment and report the evidence gap rather than inferring its contents.
+
+Reference baseline rule:
+
+- Financial/extraction baseline: Generator-Werkbon-GAS @ tag v1.7.4
+- PDF-ingestion baseline: Generator-Werkbon-GAS_v1.8.0-dev @ exact commit SHA
+
+These are distinct evidence sources. Do not attribute PDF-ingestion work to v1.7.4 unless the exact revision and source content prove it.
 
 ## Architectural boundaries that must be preserved
 
