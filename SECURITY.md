@@ -12,8 +12,7 @@ PII and declarant configuration must not be committed to Git. Values such as nam
 
 The system must keep source-document extraction and declarant profile data separate until declaration assembly. Receipt or invoice extraction is treated as document-content processing, while declarant profile data is handled as deployment-level configuration.
 
-Declarant-profile values must never be sent to OpenAI for receipt or invoice extraction. The extraction stage should operate only on document content and normalized document metadata, not on applicant identity or financial account data.
-
+Declarant-profile values must never be sent to OpenAI for receipt or invoice extraction. The extraction stage should operate only on source-document content and processing metadata required for extraction, not on declarant identity or financial account data.
 ## Access control
 
 Apps Script Script Properties reduce the risk that PII is exposed through source control, but they are not a dedicated secrets-management system. Access to the Apps Script project must therefore be restricted to a limited set of authorized users and administrators.

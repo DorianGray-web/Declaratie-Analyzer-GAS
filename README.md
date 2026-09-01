@@ -36,8 +36,8 @@ The repository does not copy Werkbon-specific output logic, and it does not impl
 
 ## Key design constraints
 
-- The relevant document date is the date the receipt or invoice was issued or generated, not necessarily the order date.
-- Declaration reference is deterministically derived as YYYYMMDD + applicantCode.
+- The relevant document date represents the issuance/generation date of the receipt or invoice rather than merely the order date. Rules for identifying that date in ambiguous documents remain future design work.
+- Each source document contributes a declaration reference derived as YYYYMMDD + applicantCode from its relevant document date. Source documents with the same relevant date may therefore share the same declaration reference.
 - Multiple source documents may share the same declaration reference when applicable.
 - This v1 implementation is explicitly single-declarant: one GAS deployment serves one declarant profile.
 - Declarant PII and configuration such as name, address, postcode, city, IBAN, BSN, creditor number, and applicant code must not be committed to Git; they are stored in Apps Script Script Properties.
