@@ -1,0 +1,16 @@
+# Local editor and OS files
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# GAS project-local runtime and sensitive configuration
+# Do not commit declarant PII or Script Properties values.
+*.local
+.env
+.env.*
+
+# Temporary and generated files
+*.tmp
+*.log
