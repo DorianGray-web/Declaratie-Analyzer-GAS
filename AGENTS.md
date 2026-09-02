@@ -31,7 +31,10 @@ If a requested change would alter an established security, privacy, or architect
 Reference baseline rule:
 
 - Financial/extraction baseline: Generator-Werkbon-GAS @ tag v1.7.4
-- PDF-ingestion baseline: Generator-Werkbon-GAS_v1.8.0-dev @ exact commit SHA
+  commit a75264f06eb66cbce34a822502645f8adc4475ed
+
+- PDF-ingestion baseline: Generator-Werkbon-GAS @ tag v1.8.0
+  commit ade14f485d6932d09c6f471f6d2a2ac24ccb2094
 
 These are distinct evidence sources. Do not attribute PDF-ingestion work to v1.7.4 unless the exact revision and source content prove it.
 
