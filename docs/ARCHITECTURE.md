@@ -31,6 +31,8 @@ The ingestion layer accepts image or PDF documents and normalizes them into a pr
 
 This layer is responsible for handling the file type and preserving the source document as a first-class record.
 
+Declaratie Analyzer v1 applies a project-local maximum raw PDF size of 5 MiB (`5 * 1024 * 1024` bytes). A PDF that exceeds this limit is rejected before OpenAI transport. This is an ingestion policy, not a universal OpenAI platform limit, and it may be changed later without changing the canonical financial model.
+
 ### 2. Document extraction
 
 The extraction layer produces normalized document-level facts and line-item facts from the source document content. It is responsible for identifying:
