@@ -33,6 +33,32 @@ The contract is financial-domain oriented. It is not shaped around Google Sheets
 - sourceDocumentId: the authoritative source-document identifier when resolved. This value may be unresolved.
 - Authoritative selection rules for documentDate and sourceDocumentId remain deferred. No heuristics are defined at this layer.
 
+#### Source Document Identity Evidence
+
+Source Document Identity Evidence is the non-authoritative set of identity-related observations extracted from a source document. It is an intermediate boundary between extraction and authoritative identity resolution; it is not part of the canonical identity merely because an extraction model reported it.
+
+An observation may preserve:
+
+- the observed value;
+- the printed/raw value when normalization occurs;
+- the printed label, when one is present;
+- the semantic or document context in which the value appears; and
+- the document type available to extraction.
+
+This list defines the required evidence semantics, not a final serialization shape. Every normalized identity value must remain traceable to its printed source-document evidence.
+
+Equivalent identity evidence can appear under different labels or through document context. For example, an invoice date may be printed as either an explicit invoice-date label or as a date within an invoice header, while a receipt identifier may appear as a bon number or ticket identifier. A printed label is therefore evidence but is not, by itself, a universal selection rule. The absence of one particular label does not establish that identity evidence is absent.
+
+Dates and identifiers with other meanings, such as order dates, order numbers, customer numbers, due dates, cash-register or transaction data, and barcodes, may coexist with identity evidence. They must retain their observed meaning and must not silently replace the source-document identity.
+
+The boundary is:
+
+1. Extraction reports observed Source Document Identity Evidence.
+2. Identity Resolution evaluates that evidence under an authoritative selection policy.
+3. Only sufficiently resolved values populate `documentDate` and `sourceDocumentId` in the Canonical Financial Document.
+
+Extraction, including model-based extraction, does not make the final authoritative selection. If Identity Resolution cannot distinguish identity evidence sufficiently, the corresponding canonical field remains unresolved. Universal selection heuristics, vendor-specific rules, confidence thresholds, and fallback behavior remain deferred.
+
 ### Financial Expenses
 
 Expense lines contain:
