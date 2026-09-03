@@ -38,6 +38,65 @@ Reference baseline rule:
 
 These are distinct evidence sources. Do not attribute PDF-ingestion work to v1.7.4 unless the exact revision and source content prove it.
 
+## Local Review Evidence
+
+The repository may be accompanied by a local `.review-evidence/` directory containing real-world material used to review extraction and declaration behavior.
+
+This directory is local-only, ignored by Git, and is not part of the repository source of truth.
+
+It may contain sensitive or personally identifiable information, including filled declarations, receipts, invoices, account-related data, or other real source-document content.
+
+### Access boundary
+
+Agents may inspect `.review-evidence/` only when the current task explicitly requires review of local evidence.
+
+Do not inspect, enumerate, summarize, or process this directory merely because it exists.
+
+### Permitted use
+
+When explicitly authorized for the current task, local review evidence may be used to:
+
+- understand real source-document structures;
+- compare source documents with their resulting declaration representation;
+- review proposed extraction contracts and architecture;
+- identify evidence-backed requirements, ambiguities, and missing cases;
+- derive sanitized or synthetic test scenarios.
+
+Local review evidence is evidence, not an implementation specification.
+
+### Prohibited use
+
+Content from `.review-evidence/` must not be:
+
+- staged, committed, or pushed to Git;
+- copied into tracked source files, documentation, tests, fixtures, logs, or generated repository artifacts;
+- reproduced in agent reports beyond the minimum information required for the task;
+- sent to external services unless the current task explicitly authorizes that specific processing and it complies with project security and privacy rules;
+- treated as an exhaustive representation of supported documents;
+- converted into vendor-specific production rules;
+- used to invent confidence thresholds, fallback heuristics, or undocumented financial or identity-selection policy.
+
+Never expose declarant PII or other sensitive values merely to explain a finding. Prefer structural descriptions, field names, sanitized examples, or synthetic values.
+
+### Derived artifacts
+
+Any tracked documentation, regression fixture, or test derived from local review evidence must contain only sanitized or synthetic data.
+
+If sanitization cannot preserve the evidence required for a proposed tracked artifact, keep that artifact local rather than weakening this boundary.
+
+### Evidence authority
+
+`.review-evidence/` provides observational evidence only.
+
+It does not override:
+
+1. security and privacy requirements;
+2. accepted ADRs;
+3. `docs/ARCHITECTURE.md`;
+4. other authoritative project contracts.
+
+When local evidence exposes behavior not covered by an accepted contract, report the gap and preserve the case as unresolved rather than inventing a generalized rule.
+
 ## Architectural boundaries that must be preserved
 
 - v1 is single-declarant.

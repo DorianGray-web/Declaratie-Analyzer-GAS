@@ -17,3 +17,6 @@ Thumbs.db
 # Temporary and generated files
 *.tmp
 *.log
+
+# Local review-only evidence; may contain sensitive or personally identifiable data.
+.review-evidence/
