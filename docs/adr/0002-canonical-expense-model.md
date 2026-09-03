@@ -27,11 +27,27 @@ The contract is financial-domain oriented. It is not shaped around Google Sheets
 - sourceFileName: original file name of the source document.
 - mimeType: MIME type of the source document.
 
+### Representation Boundary
+
+The architecture separates three representations:
+
+1. Source Evidence preserves the printed/raw value from the source document.
+2. Canonical Value is the normalized, calculation-safe business value.
+3. Presentation Value is produced by a downstream adapter for display.
+
+For money, a printed value such as `€ 17,29` is preserved as Source Evidence and represented canonically as `1729` integer minor units for EUR. All canonical monetary arithmetic and financial reconciliation use integer minor units, not formatted currency strings or floating-point arithmetic.
+
+Unless a value is explicitly identified as raw Source Evidence, monetary fields in this contract, including fields named `printedAmount`, `printedUnitAmount`, or `printedLineAmount`, contain integer minor units. "Printed" identifies the value's source, not its presentation format.
+
+For presentation, a future Google Sheets adapter may convert `1729` minor units to the numeric spreadsheet value `17.29` and allow the template to display it as `€ 17,29`. Spreadsheet currency and locale formatting are presentation concerns and do not define the canonical financial model. Where spreadsheet formulas or numeric calculations are required, the adapter provides numeric values rather than preformatted currency strings.
+
 ### Identity Boundary
 
-- documentDate: the relevant document date when authoritatively resolved. This value may be unresolved.
+- documentDate: the relevant document date when authoritatively resolved, represented as a date-only canonical value in `YYYY-MM-DD` form. This value may be unresolved.
 - sourceDocumentId: the authoritative source-document identifier when resolved. This value may be unresolved.
 - Authoritative selection rules for documentDate and sourceDocumentId remain deferred. No heuristics are defined at this layer.
+
+`documentDate` is a business date, not an artificial midnight timestamp. Normalization must not introduce a time or timezone-derived date change. A processing value such as `processedAt` is a timestamp and remains separate from source-document identity. For example, the Source Evidence `10 augustus 2026` may normalize to the canonical date `2026-08-10` and later be presented as `10/08/2026`. Google Sheets date formatting remains a presentation concern.
 
 #### Source Document Identity Evidence
 
@@ -75,6 +91,26 @@ Expense lines contain:
 
 Additional costs are classified separately from line items.
 
+### Financial Adjustments
+
+An observed negative financial adjustment is preserved as a signed printed amount. It is not silently discarded and must never be transformed into a positive expense.
+
+An adjustment contains at least:
+
+- description;
+- printedAmount: the signed printed amount, represented canonically in integer minor units;
+- adjustmentType; and
+- traceability to its Source Evidence where normalization occurs.
+
+The v1 adjustment types are:
+
+- `COMMERCIAL_DISCOUNT`: a seller-provided commercial reduction, such as a promotion, seasonal discount, holiday discount, or sale discount, when that meaning is supported by Source Evidence.
+- `PERSONAL_BENEFIT`: a reduction arising from a personal accumulated benefit or credit, such as redeemed loyalty points, bonus points, or personal store credit, when that meaning is supported by Source Evidence.
+- `OTHER_ADJUSTMENT`: a clearly observed signed financial adjustment whose known meaning does not belong to another accepted category.
+- `UNRESOLVED`: an observed adjustment for which Source Evidence is insufficient to assign another accepted type reliably.
+
+Adjustment classification is evidence-based. This contract defines no vendor-specific rules, keyword tables, confidence thresholds, or broader adjustment taxonomy.
+
 ### VAT Evidence
 
 VAT information represents values extracted from printed source-document evidence. No allocation of VAT across line items or cost categories is performed.
@@ -89,10 +125,22 @@ These reflect printed totals from the source document.
 
 ### Reconciliation
 
-- status: result of deterministic reconciliation (e.g. reconciled, unreconciled).
-- difference: numeric difference when reconciliation is performed.
+- status: `MATCHED`, `MISMATCH`, or `NOT_CHECKABLE`.
+- difference: the difference in integer minor units when a deterministic comparison is performed; it is unavailable for `NOT_CHECKABLE`.
 
-Reconciliation uses printed financial values. Printed values are preferred over any reconstructed amounts. Reconciliation is performed by deterministic code, not by the extraction step. Reconciliation outcomes and discrepancies must remain visible to downstream logic.
+The statuses mean:
+
+- `MATCHED`: sufficient usable printed financial evidence exists for a deterministic comparison, and the reconstructed arithmetic exactly equals the applicable printed comparison total in integer minor units.
+- `MISMATCH`: sufficient usable printed financial evidence exists for a deterministic comparison, but the reconstructed arithmetic differs from the applicable printed comparison total.
+- `NOT_CHECKABLE`: the source document does not provide sufficient usable printed evidence for a deterministic comparison.
+
+Missing printed totals do not produce `MATCHED`. Reconciliation uses printed financial values and must not rewrite extracted evidence to force a match. It is performed in integer minor units by deterministic code, not by the extraction step or an OpenAI/model judgment. No arbitrary reconciliation tolerance is applied.
+
+Where Source Evidence supports it, reconciliation may use an appropriate printed excl.-VAT or incl.-VAT comparison basis. Signed adjustments participate in reconstructed source-document arithmetic when the printed evidence establishes that they are part of that arithmetic. Exact reconciliation equations and basis-selection rules that are not established by this contract remain deferred rather than inferred.
+
+Reconciliation determines whether the arithmetic printed on the source document has been reconstructed correctly. It does not decide reimbursement eligibility or the amount that a future declaration policy should reimburse. A document can therefore reconcile successfully after a `PERSONAL_BENEFIT` reduction without establishing whether reimbursement should use the reduced amount, the pre-reduction amount, or another amount.
+
+Reconciliation outcomes and discrepancies remain visible to downstream logic. VAT is not redistributed across expense lines or cost categories during reconciliation.
 
 ### Constraints
 
