@@ -41,6 +41,110 @@ Unless a value is explicitly identified as raw Source Evidence, monetary fields 
 
 For presentation, a future Google Sheets adapter may convert `1729` minor units to the numeric spreadsheet value `17.29` and allow the template to display it as `€ 17,29`. Spreadsheet currency and locale formatting are presentation concerns and do not define the canonical financial model. Where spreadsheet formulas or numeric calculations are required, the adapter provides numeric values rather than preformatted currency strings.
 
+### Raw Document Extraction Boundary
+
+`RawDocumentExtraction` is the Source Evidence representation between provider-specific extraction and later normalization, Identity Resolution, and reconciliation. Image and PDF transports may use different provider envelopes, but both must produce this same semantic representation. Transport-specific response fields are not part of this contract.
+
+The completed representation contains trusted local provenance and model-authored observations:
+
+```text
+RawDocumentExtraction {
+  sourceProvenance: {
+    sourceFileName: string,
+    mimeType: string
+  },
+  documentTypeEvidence?: RawObservation,
+  identityEvidence: {
+    dates: RawObservation[],
+    identifiers: RawObservation[]
+  },
+  financialEvidence: {
+    items: RawExpenseObservation[],
+    additionalCosts: RawAdditionalCostObservation[],
+    adjustments: RawAdjustmentObservation[],
+    vat: RawVatObservation[],
+    totals: RawTotalObservation[]
+  }
+}
+
+RawObservation {
+  rawValue: string,
+  printedLabel?: string,
+  context?: string
+}
+
+RawExpenseObservation {
+  description: RawObservation,
+  quantity?: RawObservation,
+  printedUnitAmount?: RawObservation,
+  printedLineAmount?: RawObservation
+}
+
+RawAdditionalCostObservation {
+  description?: RawObservation,
+  quantity?: RawObservation,
+  printedUnitAmount?: RawObservation,
+  printedLineAmount?: RawObservation
+}
+
+RawAdjustmentObservation {
+  description?: RawObservation,
+  printedAmount: RawObservation
+}
+
+RawVatObservation {
+  printedRate?: RawObservation,
+  printedAmount?: RawObservation
+}
+
+RawTotalObservation {
+  printedAmount: RawObservation
+}
+```
+
+`sourceFileName` and `mimeType` are copied from the locally validated Encoded Source File. They are not model-authored fields, and the model is not trusted to reproduce or establish them. A filename is provenance only; its contents do not become source-document identity through this contract.
+
+The provider/model output consists only of `documentTypeEvidence`, `identityEvidence`, and `financialEvidence`. Structural validation applies to that model-authored portion before local code attaches `sourceProvenance` to form the completed `RawDocumentExtraction`. Model output that attempts to supply provenance or canonical fields is unexpected and fails structural validation.
+
+The two evidence objects and their named collections are required, but every collection may be empty. `documentTypeEvidence` and fields marked with `?` may be omitted; omission, rather than `null`, represents an observation that was not reported. An emitted item requires a description. An emitted additional cost requires at least one printed amount. An emitted adjustment requires its signed printed amount. An emitted VAT observation requires at least a printed rate or printed amount. An emitted total requires its printed amount.
+
+Every emitted `RawObservation` requires a non-empty `rawValue`. `printedLabel` and `context` are included only when observed or needed to preserve the printed meaning. They qualify the specific `RawObservation` in which they occur and are not duplicated on enclosing composite observations; they remain non-authoritative Source Evidence and do not establish VAT, total, or additional-cost classification. Raw monetary and date values retain their source representation at this boundary. Deterministic parsing may later produce integer-minor-unit values or normalized date candidates, but those are not fields of `RawDocumentExtraction`. A normalized date candidate is not an authoritative `documentDate`.
+
+The `vat` collection may contain both line-level and document-level observations. The `totals` collection preserves printed subtotals and totals without assigning them a canonical role. Collections preserve repeated and competing observations in extraction order. Structural validation does not deduplicate, merge, select, or otherwise collapse them into canonical singleton values.
+
+#### Structural Validation and Failure Semantics
+
+Post-model structural validation establishes only that the extraction result conforms to the raw representation. It may validate:
+
+- that the model output is parseable JSON with the expected top-level object;
+- that required evidence objects and collections have the declared types;
+- that emitted observations use the declared object shapes;
+- that required raw values are non-empty strings; and
+- that only fields declared by this raw contract are present.
+
+Malformed top-level output fails the complete extraction explicitly. A malformed emitted observation also fails the complete extraction; it is not silently dropped or repaired. Optional observations may be absent and collections may be empty, but an object that is present must satisfy its complete declared shape. Unknown or unexpected fields fail structural validation so that model-authored canonical claims or an unreviewed schema extension cannot pass silently.
+
+Structural validity means only that the reported Source Evidence is well formed. It does not mean that the evidence is complete, financially consistent, sufficient for normalization, or sufficient to resolve identity. Empty or incomplete-but-valid evidence remains available for later insufficiency handling; validation does not turn it into canonical success.
+
+Structural validation does not:
+
+- normalize money into integer minor units;
+- normalize or select an authoritative date;
+- select a source document ID;
+- perform financial arithmetic or reconstruct missing values;
+- reconcile printed totals or assign a reconciliation result;
+- redistribute VAT;
+- decide reimbursement eligibility, declaration grouping, or cross-document consolidation; or
+- apply confidence thresholds, fallback heuristics, or silent correction.
+
+#### Classification Authority
+
+Raw collections report the broad kind of evidence observed, but they do not contain model-authored canonical classifications. In particular, the raw contract contains no `SHIPPING` or `FEE` enum, no adjustment-type enum, and no `EXCL_VAT`, `VAT_AMOUNT`, or `INCL_VAT` total-role enum.
+
+Printed labels, descriptions, raw values, and context preserve the evidence needed for later classification. A clearly printed shipping label may therefore be reported as an additional-cost observation, but its placement does not by itself establish the canonical additional-cost type. Adjustment types, including `PERSONAL_BENEFIT`, are assigned only during later evidence-based normalization; weak contextual inference by the extraction model is insufficient. Total roles are likewise established later from printed evidence and are not reconstructed from arithmetic at this boundary.
+
+The absence of raw classification enums does not change the accepted canonical categories below. It keeps their assignment outside model authority and allows ambiguous evidence to remain unresolved.
+
 ### Identity Boundary
 
 - documentDate: the relevant document date when authoritatively resolved, represented as a date-only canonical value in `YYYY-MM-DD` form. This value may be unresolved.
