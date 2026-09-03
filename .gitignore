@@ -5,6 +5,9 @@ Thumbs.db
 # VS Code
 .vscode/
 
+# clasp local project configuration
+.clasp.json
+
 # GAS project-local runtime and sensitive configuration
 # Do not commit declarant PII or Script Properties values.
 *.local
