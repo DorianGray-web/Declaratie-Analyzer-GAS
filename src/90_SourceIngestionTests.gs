@@ -145,6 +145,8 @@ function doGet() {
     }, SOURCE_INGESTION_ERROR_CODES.invalidSourceMetadata);
   });
 
+  registerRawDocumentExtractionTests_();
+
   QUnit.start();
   return QUnitGS2.getHtml();
 }
