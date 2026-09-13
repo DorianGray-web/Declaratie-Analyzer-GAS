@@ -146,6 +146,7 @@ function doGet() {
   });
 
   registerRawDocumentExtractionTests_();
+  registerCanonicalFinancialDocumentTests_();
 
   QUnit.start();
   return QUnitGS2.getHtml();
