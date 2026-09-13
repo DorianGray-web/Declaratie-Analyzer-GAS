@@ -30,6 +30,10 @@ const QUNIT_TEST_REGISTRATIONS = Object.freeze([
   Object.freeze({
     id: 'processed-financial-document-tests',
     register: function() { registerProcessedFinancialDocumentTests_(); }
+  }),
+  Object.freeze({
+    id: 'financial-document-registry-tests',
+    register: function() { registerFinancialDocumentRegistryTests_(); }
   })
 ]);
 
@@ -40,7 +44,8 @@ const QUNIT_AUTHORITATIVE_GAS_BATCHES = Object.freeze([
   Object.freeze({ selector: 'evidence-record', registrationIds: Object.freeze(['evidence-record-tests']) }),
   Object.freeze({ selector: 'drive-evidence-store', registrationIds: Object.freeze(['drive-evidence-store-tests']) }),
   Object.freeze({ selector: 'test-harness', registrationIds: Object.freeze(['test-harness-tests']) }),
-  Object.freeze({ selector: 'processed-financial-document', registrationIds: Object.freeze(['processed-financial-document-tests']) })
+  Object.freeze({ selector: 'processed-financial-document', registrationIds: Object.freeze(['processed-financial-document-tests']) }),
+  Object.freeze({ selector: 'financial-document-registry', registrationIds: Object.freeze(['financial-document-registry-tests']) })
 ]);
 
 const QUNIT_TEST_HARNESS_ERROR_CODES = Object.freeze({

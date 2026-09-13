@@ -73,6 +73,7 @@ lifecycles. Invoke the deployed test web app once for each selector:
 - `?batch=drive-evidence-store`
 - `?batch=test-harness`
 - `?batch=processed-financial-document`
+- `?batch=financial-document-registry`
 
 Each request initializes QUnitGS2 and registers only its selected test module.
 An unknown, retired, or explicitly empty selector fails closed instead of running
@@ -87,6 +88,14 @@ do not prove completion of the real GAS reporter lifecycle.
 No numeric test, assertion, or payload limit is assumed. See
 [LESSONS_LEARNED.md](LESSONS_LEARNED.md)
 for the cross-project evidence and diagnostic procedure.
+
+The Registry core reads its workbook ID through the injected
+`REGISTRY_SPREADSHEET_ID` configuration boundary and uses injected Spreadsheet
+and script-lock adapters. Slice 4B includes the locally testable core and fake
+adapters only: it does not read Script Properties, open a live Spreadsheet, or
+prove real Apps Script locking, range-write, flush, cell-capacity, or QUnitGS2
+reporter behavior. The named 50,000-code-unit JSON guard is a conservative
+pre-integration safety rule, not a claim about a proven `Range.setValue` limit.
 
 ## Current status
 
