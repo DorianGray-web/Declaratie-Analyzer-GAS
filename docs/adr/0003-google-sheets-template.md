@@ -10,7 +10,7 @@ The declaration process requires a presentation format for final review and down
 
 The project will use a Google Sheets template as the presentation layer. A clean template will be copied, then populated with declaration data rather than generating the declaration layout from scratch.
 
-The final PDF export is treated as a downstream step after the populated sheet is assembled and reviewed.
+The Sheet export is treated as a downstream step after the populated sheet is assembled and reviewed. It produces the primary Declaratie PDF; ADR 0006 defines the later self-contained archival package that places this PDF first and appends all expected source evidence.
 
 ## Consequences
 
@@ -19,3 +19,9 @@ The final PDF export is treated as a downstream step after the populated sheet i
 - Allows declarant review before final export.
 - Keeps the architecture clear: extraction and normalization are separate from the presentation layer.
 - Requires template management and version control for the underlying Sheet structure.
+- Treats the populated Sheet as a restricted, persistent PII-bearing artifact during review; its post-archive retention remains an open policy question under ADR 0006.
+
+## Dependencies
+
+- ADR 0001 defines the declarant-profile boundary used during rendering.
+- ADR 0006 defines archival packaging and the reviewed Sheet's lifecycle after primary PDF export.

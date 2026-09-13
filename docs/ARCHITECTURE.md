@@ -9,11 +9,12 @@ The repository defines the architecture for a Google Apps Script tool that gener
 ## Scope and constraints
 
 - Input documents may be images or PDFs.
-- Source document processing must retain both the source date and the source document ID or invoice number.
+- Source document processing must retain date and identifier evidence so authoritative `documentDate` and `sourceDocumentId` values can be resolved without losing traceability.
 - The relevant document date is the date the receipt or invoice was issued or generated, not necessarily the order date.
-- Extracted content includes document date, document ID, expense lines, quantities, VAT, shipping, commercial or government fees, adjustments, and printed totals.
-- Multiple source documents may be grouped into a single declaration, typically for a monthly reimbursement submission.
-- The declaration reference is derived deterministically as YYYYMMDD + applicantCode.
+- Extracted observations include date and identifier evidence, expense lines, quantities, VAT, shipping, commercial or government fees, adjustments, and printed totals.
+- Recognized source documents accumulate in a common registry and are later selected using resolved declaration-period boundaries.
+- Confirmed source documents are grouped into date+payer operations inside a declaration.
+- The non-unique operation reference is derived deterministically as YYYYMMDD + applicantCode.
 - Every source document remains an individual record with its own date and document ID.
 - v1 is single-declarant and single-deployment: one GAS deployment serves one declarant profile.
 
@@ -55,29 +56,64 @@ Extracted values are normalized into a canonical financial model before declarat
 
 The canonical model is the basis for reconciliation between source-document totals and declaration totals.
 
-### 4. Declaration assembly
+### 4. Evidence registry
 
-Multiple source documents may be combined into a declaration for a monthly reimbursement submission. Declaration assembly uses the normalized financial model and the declarant profile, while preserving the identity and dates of each individual source document.
+Each physical/source evidence artifact receives a stable system-owned `evidenceId` and an `EvidenceRecord` with a retrievable content reference and required provenance/integrity metadata. A processed-document envelope links that identity to its canonical financial document without adding storage mechanics to the canonical model.
 
-The declaration reference is deterministic and remains reusable across multiple source documents when appropriate.
+Recognized documents accumulate in one common financial-document registry. Recognition is not declaration or archival, and lifecycle authority does not come from filenames. A document remains the unit of declaration assignment even when it contains multiple financial lines.
 
-### 5. Presentation and export
+### 5. Declaration selection and assembly
+
+The user selects a period whose inclusive resolved `startDate` and `endDate` are persisted with a stable `declarationInstanceId`. Identity Resolution must first have produced an authoritative `documentDate`; unresolved dates require review and receive no upload/file/recognition/current-date fallback.
+
+The workflow filters recognized, unconflicted documents into a candidate preview before deterministic sorting and human confirmation. Confirmation freezes document membership, authoritative declaration associations, and the basis of the `ExpectedEvidenceManifest` in one consistency boundary. Late evidence for a finalized period requires explicit review and does not silently change historical assignments.
+
+After membership is frozen, assembly derives operations by `(documentDate, payer)`. Each operation uses `operationReference = YYYYMMDD(documentDate) + applicantCode`. Multiple documents may share this accounting reference; it is not a declaration or evidence identity and its historical value is frozen with the declaration.
+
+Declaration assembly is the first point where the confirmed canonical documents and the minimally required declarant rendering data meet. It preserves each document's identity and date.
+
+The exact `applicantCode` normalization edge cases and whether payer can differ from the configured declarant remain open business decisions.
+
+### 6. Presentation and primary export
 
 A clean Google Sheets template is copied and populated rather than generating the declaration layout from scratch. The output sheet is intended to serve as the presentation layer for review and downstream PDF export.
 
-Final PDF export is a downstream step after the sheet has been populated and validated.
+Primary Declaratie PDF export is a downstream step after the Sheet has been populated, reviewed, and confirmed.
+
+### 7. Archival packaging
+
+The reviewed declaration and frozen `ExpectedEvidenceManifest` enter a downstream package builder. It creates a candidate containing the primary Declaratie PDF first and every page of every expected evidence item afterward in deterministic order. A validator proves manifest-to-output completeness and final-PDF validity before controlled publication; partial or invalid candidates are never final.
+
+Packaging uses `evidenceId` membership supplied by the confirmed declaration. It does not scan folders to rediscover membership, resolve identity or periods, repair Level-1 membership, or invoke an extraction provider.
 
 ## Security and separation of concerns
 
-This architecture separates declarant profile configuration from source-document extraction. The declarant profile includes PII and configuration such as name, address, postcode, city, IBAN, BSN, creditor number, and applicant code.
+This architecture separates `DeclarantProfile` configuration from source-document extraction, canonical normalization, the evidence registry, declaration associations, and evidence manifests. The profile includes PII and configuration such as name, address, postcode, city, IBAN, BSN/KvK, creditor number, and surname/applicant information.
 
-These values are stored in Apps Script Script Properties and are excluded from source control. They are not sent to OpenAI during extraction.
+One deployment owns one authoritative profile stored in Script Properties and excluded from source control. Another declarant uses another deployment. Script Properties are neither encryption nor a secrets vault, so every project owner/editor is trusted for profile access and access must be tightly restricted.
 
 The architecture requires that:
 
-- document parsing and extraction remain independent from declarant profile data
-- declaration assembly is the point where both domains are combined
-- the Apps Script project is access-restricted because Script Properties are not a dedicated secrets-management system
+- document parsing and extraction remain independent from configured profile data;
+- configured profile data is not sent to the extraction provider or copied into raw/canonical documents, evidence/registry records, associations, or manifests;
+- source evidence may independently contain PII and remains a separate restricted provider-processing concern;
+- the profile is normally materialized only for declaration assembly/rendering after membership is frozen, and only minimum downstream views are provided;
+- BSN and IBAN exist only where required for protected configuration and controlled declaration rendering/output;
+- temporary Sheets, evidence, PDFs, and package candidates have restricted access, neutral naming where practical, known ownership, explicit lifecycle, and observable cleanup;
+- archival publication uses a restricted location, neutral filenames, validation, and no silent overwrite.
+
+See `SECURITY.md` for normative handling and logging rules.
+
+## Cross-ADR invariants
+
+- one deployment = one declarant;
+- `RECOGNIZED != DECLARED != ARCHIVED`;
+- `evidenceId != sourceDocumentId != operationReference != declarationInstanceId`;
+- period filtering precedes sorting and operation grouping;
+- confirmed documents = frozen associations = manifest evidence IDs;
+- the primary Declaratie is first and every expected evidence page is represented;
+- no partial candidate is published as final;
+- `DeclarantProfile` does not enter extraction, canonical documents, the registry, associations, or manifests.
 
 ## Known design gaps
 
@@ -88,7 +124,14 @@ These items are deliberately recorded as deferred design work and not implemente
 - detailed extraction confidence scoring and fallback handling
 - final tax and fee normalization rules beyond the canonical model requirement
 - final output-layout generation rules for the declaration presentation sheet
+- exact applicant-code normalization edge cases
+- whether actual payer may differ from the configured declarant
+- reviewed-Sheet retention after archival and failed-artifact recovery windows
+- municipality/accounting retention and permanent-deletion requirements
+- archive correction/replacement procedure
+- extraction-provider retention/data-control requirements for evidence that itself contains PII
+- whether structured historical profile snapshots are required after final archival output exists
 
 ## Current status
 
-This repository contains only the architecture baseline and not the actual application implementation.
+This repository contains the architecture baseline and limited ingestion/raw/canonical contract code. Declaration selection, assembly, rendering, and packaging remain unimplemented.

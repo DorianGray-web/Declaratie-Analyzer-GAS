@@ -104,6 +104,7 @@ When local evidence exposes behavior not covered by an accepted contract, report
 - source-document extraction is not a vehicle for exposing declarant profile data.
 - declarant PII and applicant code must not be committed to Git.
 - declarant PII/configuration must not be sent to OpenAI for document extraction.
+- agents must follow `SECURITY.md`; normal coding/review work must not request or expose real Script Properties, `DeclarantProfile` values, BSN, IBAN, or unredacted declaration output.
 - Script Properties are configuration storage; they are not a dedicated secrets-management system.
 - extraction precedes canonical normalization.
 - the canonical financial model is the source of truth for declaration assembly.
@@ -116,11 +117,11 @@ Use these terms consistently:
 - source document ID
 - relevant document date
 - canonical financial model
-- declaration reference
+- operation reference
 - declarant profile
 - declaration assembly
 
-The declaration reference is derived from the relevant document date and applicant code according to the documented architecture. Do not introduce additional grouping rules.
+The operation reference is derived from authoritative `documentDate` and `applicantCode` and groups declaration documents by date and payer according to ADR 0005. It is not a declaration ID. Do not introduce additional grouping rules.
 
 ## Prohibited speculative design
 

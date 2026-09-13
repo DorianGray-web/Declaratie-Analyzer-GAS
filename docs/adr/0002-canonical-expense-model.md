@@ -248,7 +248,7 @@ Reconciliation outcomes and discrepancies remain visible to downstream logic. VA
 
 ### Constraints
 
-- The contract contains no declarant profile data or PII.
+- The contract contains no configured `DeclarantProfile` data. Source provenance or financial evidence may independently contain PII and remains restricted under `SECURITY.md`.
 - Declarant data is never required by this contract and must not be sent to extraction.
 - This model precedes declaration assembly. It does not include assembly, grouping, or presentation concerns.
 - The model may be extended in the future, but extensions must preserve the minimal contract as the exchange format from normalization.
