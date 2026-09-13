@@ -12,11 +12,12 @@ separate from preventive measures adopted by this repository.
 **Evidence level:** Direct Declaratie Analyzer real Google Apps Script / QUnitGS2
 v23 runtime evidence, supported by earlier cross-project G-W-GAS evidence.
 
-**Source/context:** A substantial G-W-GAS lifecycle ran normally until near its
-end but produced malformed, blank, reordered, or incomplete reporter records and
-could omit the final summary. The affected logical components passed in fresh,
-smaller lifecycles. Reporter behavior also changed when result payloads were
-compacted.
+**Source/context:** The [QUnitGS2 implementation](https://github.com/artofthesmart/QUnitGS2/blob/master/QUnitGS2.gs)
+accumulates assertion and test results in the `qunit_test_results` CacheService
+entry and serializes object assertion values through `QUnit.dump.parse()`. Google
+Apps Script [Cache documentation](https://developers.google.com/apps-script/reference/cache/cache)
+specifies a maximum value size of 100 KB per key. An earlier G-W-GAS
+investigation reproduced a capacity failure in this accumulated result payload.
 
 ### OBSERVED
 
@@ -34,18 +35,25 @@ compacted.
   `read-models` passed 7 / 43 / 0.
 - All original Registry tests and assertions remain represented: 37 tests and
   229 assertions in total.
-- In the earlier G-W-GAS case, a successful assertion exposed two complete
-  serialized projection strings as QUnit actual and expected operands and the
-  reporter lost the test record/summary. Performing the same complete comparison
-  in code and supplying QUnit only the boolean result avoided that failure.
+- In the earlier G-W-GAS reproduction, two assertions exposed large complete
+  values to the QUnit result payload. The accumulated result crossed the cache
+  value limit after QUnitGS2 created the next test placeholder but before
+  `testDone` completed, producing a malformed/empty reporter record and no final
+  suite result. Compacting the values supplied to QUnit while preserving the
+  complete comparison in code removed that reproduced failure.
 
 ### INFERENCE
 
 - No Registry semantic failure was reproduced.
-- The evidence supports QUnitGS2 lifecycle/result-reporting pressure in the
-  combined Registry lifecycle.
-- The evidence does not establish a specific CacheService implementation
-  mechanism or a universal byte, test-count, or assertion-count threshold.
+- The matching Declaratie Analyzer reporter phenotype and successful
+  architecture-aligned partition strongly support the same QUnitGS2 accumulated
+  result-payload/cache-capacity failure class demonstrated in G-W-GAS.
+- Declaratie Analyzer did not independently measure the `qunit_test_results`
+  payload at its failure boundary or prove that its failing write exceeded
+  exactly 100 KB.
+- The evidence does not establish a universal safe byte, test-count, or
+  assertion-count threshold, nor that every QUnitGS2 reporter truncation has this
+  cause.
 - Neither 25 tests nor 155 of 229 assertions is a demonstrated platform limit.
 
 ### MITIGATION
@@ -90,9 +98,10 @@ partition by arbitrary test counts, silently fall back on selector errors, infer
 a semantic failure from incomplete reporting alone, or expose large operands to
 QUnit merely for verbose diagnostics.
 
-**Limitations / unresolved aspects:** No universal safe test count, assertion
-count, serialized-byte threshold, or exact CacheService mechanism is established.
-Local success does not prove GAS/QUnitGS2 reporter completion.
+**Limitations / unresolved aspects:** The exact Declaratie Analyzer
+`qunit_test_results` payload size at the failure boundary was not measured. No
+universal safe test count, assertion count, or serialized-byte threshold is
+established. Local success does not prove GAS/QUnitGS2 reporter completion.
 
 ## LL-002 — QUnitGS2 browser reporting requires the host-project results bridge
 
