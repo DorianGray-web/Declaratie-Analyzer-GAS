@@ -168,6 +168,11 @@ The canonical financial model is the authoritative representation for declaratio
 
 ## Validation expectations
 
+- preserve the architecture-aligned authoritative GAS test batches;
+- register every new test module in exactly one appropriate batch;
+- do not introduce an authoritative monolithic GAS lifecycle;
+- consult `LESSONS_LEARNED.md` before changing QUnitGS2 lifecycle or reporter behavior;
+
 Before claiming a task is complete:
 
 - inspect git diff

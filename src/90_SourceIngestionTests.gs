@@ -2,8 +2,57 @@
 
 var QUnit = QUnitGS2.QUnit;
 
-function doGet() {
+const QUNIT_TEST_REGISTRATIONS = Object.freeze([
+  Object.freeze({
+    id: 'source-ingestion-tests',
+    register: function() { registerSourceIngestionTests_(); }
+  }),
+  Object.freeze({
+    id: 'raw-document-extraction-tests',
+    register: function() { registerRawDocumentExtractionTests_(); }
+  }),
+  Object.freeze({
+    id: 'canonical-financial-document-tests',
+    register: function() { registerCanonicalFinancialDocumentTests_(); }
+  }),
+  Object.freeze({
+    id: 'evidence-record-tests',
+    register: function() { registerEvidenceRecordTests_(); }
+  }),
+  Object.freeze({
+    id: 'drive-evidence-store-tests',
+    register: function() { registerDriveEvidenceStoreTests_(); }
+  }),
+  Object.freeze({
+    id: 'test-harness-tests',
+    register: function() { registerTestHarnessTests_(); }
+  })
+]);
+
+const QUNIT_AUTHORITATIVE_GAS_BATCHES = Object.freeze([
+  Object.freeze({ selector: 'source-ingestion', registrationIds: Object.freeze(['source-ingestion-tests']) }),
+  Object.freeze({ selector: 'raw-document-extraction', registrationIds: Object.freeze(['raw-document-extraction-tests']) }),
+  Object.freeze({ selector: 'canonical-financial-document', registrationIds: Object.freeze(['canonical-financial-document-tests']) }),
+  Object.freeze({ selector: 'evidence-record', registrationIds: Object.freeze(['evidence-record-tests']) }),
+  Object.freeze({ selector: 'drive-evidence-store', registrationIds: Object.freeze(['drive-evidence-store-tests']) }),
+  Object.freeze({ selector: 'test-harness', registrationIds: Object.freeze(['test-harness-tests']) })
+]);
+
+const QUNIT_TEST_HARNESS_ERROR_CODES = Object.freeze({
+  invalidBatch: 'INVALID_QUNIT_BATCH',
+  invalidPartition: 'INVALID_QUNIT_PARTITION'
+});
+
+function doGet(event) {
+  const plan = resolveQUnitTestPlan_(event);
+
   QUnitGS2.init();
+  registerQUnitTestPlan_(plan);
+  QUnit.start();
+  return QUnitGS2.getHtml();
+}
+
+function registerSourceIngestionTests_() {
 
   QUnit.module('Source document ingestion');
 
@@ -144,14 +193,127 @@ function doGet() {
       });
     }, SOURCE_INGESTION_ERROR_CODES.invalidSourceMetadata);
   });
+}
 
-  registerRawDocumentExtractionTests_();
-  registerCanonicalFinancialDocumentTests_();
-  registerEvidenceRecordTests_();
-  registerDriveEvidenceStoreTests_();
+function resolveQUnitTestPlan_(event) {
+  auditQUnitBatchMembership_();
 
-  QUnit.start();
-  return QUnitGS2.getHtml();
+  const hasExplicitBatch = event && event.parameter &&
+    Object.prototype.hasOwnProperty.call(event.parameter, 'batch');
+
+  if (!hasExplicitBatch) {
+    return {
+      selector: null,
+      authoritativeGasGate: false,
+      registrationIds: QUNIT_TEST_REGISTRATIONS.map(function(registration) {
+        return registration.id;
+      })
+    };
+  }
+
+  const requestedBatch = event.parameter.batch;
+  if (typeof requestedBatch !== 'string' || requestedBatch === '') {
+    throw createQUnitTestHarnessError_(
+      QUNIT_TEST_HARNESS_ERROR_CODES.invalidBatch,
+      'QUnitGS2 batch selector is missing or invalid.'
+    );
+  }
+
+  const batch = QUNIT_AUTHORITATIVE_GAS_BATCHES.find(function(candidate) {
+    return candidate.selector === requestedBatch;
+  });
+  if (!batch) {
+    throw createQUnitTestHarnessError_(
+      QUNIT_TEST_HARNESS_ERROR_CODES.invalidBatch,
+      'Unknown QUnitGS2 batch selector.'
+    );
+  }
+
+  return {
+    selector: batch.selector,
+    authoritativeGasGate: true,
+    registrationIds: batch.registrationIds.slice()
+  };
+}
+
+function registerQUnitTestPlan_(plan) {
+  plan.registrationIds.forEach(function(registrationId) {
+    findQUnitTestRegistration_(registrationId).register();
+  });
+}
+
+function auditQUnitBatchMembership_() {
+  const registrationCounts = {};
+  const batchSelectors = {};
+
+  QUNIT_TEST_REGISTRATIONS.forEach(function(registration) {
+    if (
+      !registration || typeof registration.id !== 'string' || registration.id === '' ||
+      typeof registration.register !== 'function' ||
+      Object.prototype.hasOwnProperty.call(registrationCounts, registration.id)
+    ) {
+      throwInvalidQUnitPartition_();
+    }
+    registrationCounts[registration.id] = 0;
+  });
+
+  QUNIT_AUTHORITATIVE_GAS_BATCHES.forEach(function(batch) {
+    if (
+      !batch || typeof batch.selector !== 'string' || batch.selector === '' ||
+      !Array.isArray(batch.registrationIds) || batch.registrationIds.length === 0 ||
+      Object.prototype.hasOwnProperty.call(batchSelectors, batch.selector)
+    ) {
+      throwInvalidQUnitPartition_();
+    }
+    batchSelectors[batch.selector] = true;
+
+    const batchMembership = {};
+    batch.registrationIds.forEach(function(registrationId) {
+      if (
+        !Object.prototype.hasOwnProperty.call(registrationCounts, registrationId) ||
+        Object.prototype.hasOwnProperty.call(batchMembership, registrationId)
+      ) {
+        throwInvalidQUnitPartition_();
+      }
+      batchMembership[registrationId] = true;
+      registrationCounts[registrationId] += 1;
+    });
+  });
+
+  Object.keys(registrationCounts).forEach(function(registrationId) {
+    if (registrationCounts[registrationId] !== 1) {
+      throwInvalidQUnitPartition_();
+    }
+  });
+
+  return {
+    registrationCount: Object.keys(registrationCounts).length,
+    authoritativeBatchCount: Object.keys(batchSelectors).length
+  };
+}
+
+function findQUnitTestRegistration_(registrationId) {
+  const registration = QUNIT_TEST_REGISTRATIONS.find(function(candidate) {
+    return candidate.id === registrationId;
+  });
+  if (!registration) {
+    throwInvalidQUnitPartition_();
+  }
+  return registration;
+}
+
+function throwInvalidQUnitPartition_() {
+  throw createQUnitTestHarnessError_(
+    QUNIT_TEST_HARNESS_ERROR_CODES.invalidPartition,
+    'QUnitGS2 batch partition is invalid.'
+  );
+}
+
+function createQUnitTestHarnessError_(code, message) {
+  const error = new Error(message);
+  error.name = 'QUnitTestHarnessError';
+  error.code = code;
+  return error;
 }
 
 function createSyntheticSourceFile_(name, mimeType, size, bytes, onGetBlob) {

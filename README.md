@@ -61,6 +61,32 @@ The repository does not copy Werkbon-specific output logic, and it does not impl
 - [docs/adr/0006-self-contained-declaratie-archival-package.md](docs/adr/0006-self-contained-declaratie-archival-package.md) documents evidence-complete archival packaging.
 - [SECURITY.md](SECURITY.md) documents the security and data-handling boundaries.
 
+## Testing
+
+Authoritative GAS/QUnitGS2 regression gates are independent, architecture-aligned
+lifecycles. Invoke the deployed test web app once for each selector:
+
+- `?batch=source-ingestion`
+- `?batch=raw-document-extraction`
+- `?batch=canonical-financial-document`
+- `?batch=evidence-record`
+- `?batch=drive-evidence-store`
+- `?batch=test-harness`
+
+Each request initializes QUnitGS2 and registers only its selected test module.
+An unknown, retired, or explicitly empty selector fails closed instead of running
+the full suite.
+
+Calling `doGet()` without an event/batch remains available to local
+QUnit-compatible runners and as a legacy full-suite diagnostic. That monolithic
+route is not an authoritative GAS regression gate. The repository currently has
+no checked-in command-line runner; local harness results and declared structure
+do not prove completion of the real GAS reporter lifecycle.
+
+No numeric test, assertion, or payload limit is assumed. See
+[LESSONS_LEARNED.md](LESSONS_LEARNED.md)
+for the cross-project evidence and diagnostic procedure.
+
 ## Current status
 
 This repository is intentionally documentation-led and remains in early development. It includes limited GAS contract/validation code but not the declaration workflow, packaging implementation, or a production deployment.
