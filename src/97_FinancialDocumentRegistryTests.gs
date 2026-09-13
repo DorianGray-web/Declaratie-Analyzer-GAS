@@ -1,7 +1,7 @@
 // QUnitGS2 regression tests for the injected-adapter FinancialDocumentRegistry.
 
-function registerFinancialDocumentRegistryTests_() {
-  QUnit.module('Financial document registry');
+function registerFinancialDocumentRegistryFoundationTests_() {
+  QUnit.module('Financial document registry foundation');
 
   QUnit.test('frozen v2 topology and every exact ordered header are declared', function(assert) {
     assert.deepEqual(FINANCIAL_DOCUMENT_REGISTRY_TABS, [
@@ -130,6 +130,13 @@ function registerFinancialDocumentRegistryTests_() {
     assert.equal(failure.lock.releaseCount, 1);
   });
 
+  QUnit.test('registry errors expose only bounded metadata and no restricted payload values', testRegistryErrorsExposeOnlyBoundedMetadata_);
+  QUnit.test('configuration and workbook adapter failures use bounded registry errors', testRegistryConfigurationFailuresUseBoundedErrors_);
+}
+
+function registerFinancialDocumentRegistrySerializationTests_() {
+  QUnit.module('Financial document registry serialization');
+
   QUnit.test('EvidenceRecord serialization is compact, ordered, versioned, and round trips', function(assert) {
     const fixture = createRegistryTestFixture_({ initialized: true });
     const record = createRegistryEvidenceRecord_(1);
@@ -222,6 +229,10 @@ function registerFinancialDocumentRegistryTests_() {
     });
     assert.equal(fixture.workbook.appendCalls.length, 0);
   });
+}
+
+function registerFinancialDocumentRegistryPersistenceTests_() {
+  QUnit.module('Financial document registry persistence');
 
   QUnit.test('Evidence first write commits CAPTURED and exact retry is a no-op', function(assert) {
     const fixture = createRegistryTestFixture_({ initialized: true });
@@ -292,90 +303,20 @@ function registerFinancialDocumentRegistryTests_() {
     assert.equal(fixture.registry.findEvidenceCaptureCandidates(first.originRef, changed.sha256).length, 1);
   });
 
-  QUnit.test('processed persistence requires Evidence and exact provenance', function(assert) {
-    const missing = createRegistryTestFixture_({ initialized: true });
-    assertRegistryError_(assert, function() { missing.registry.persistProcessedFinancialDocument(createRegistryProcessedDocument_(1, {})); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.missingEvidence);
+  QUnit.test('processed persistence requires Evidence and exact provenance', testRegistryProcessedPersistenceRequiresEvidenceAndProvenance_);
+  QUnit.test('valid processed write commits RECOGNIZED and full cardinality projections', testRegistryValidProcessedWriteCommitsRecognizedDocument_);
+  QUnit.test('processed exact retry is no-op authority and repairs scoped projection drift', testRegistryProcessedRetryRepairsProjectionDrift_);
+  QUnit.test('processed conflicts including changed processedAt never overwrite first commit', testRegistryProcessedConflictsNeverOverwriteFirstCommit_);
+  QUnit.test('corrupt or duplicate Canonical rows fail closed', testRegistryCorruptOrDuplicateCanonicalRowsFailClosed_);
+  QUnit.test('unresolved identity remains recognized with blank indexes and outside date query', testRegistryUnresolvedIdentityRemainsRecognized_);
 
-    ['sourceFileName', 'mimeType'].forEach(function(fieldName) {
-      const fixture = createRegistryTestFixture_({ initialized: true });
-      const evidence = createRegistryEvidenceRecord_(1);
-      fixture.registry.persistEvidenceRecord(evidence);
-      const processed = createRegistryProcessedDocument_(1, {});
-      processed.canonicalFinancialDocument.sourceProvenance[fieldName] = fieldName === 'mimeType' ? 'image/png' : 'different.pdf';
-      assertRegistryError_(assert, function() { fixture.registry.persistProcessedFinancialDocument(processed); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.validation);
-    });
-  });
+  QUnit.test('serialized writes make exact retry and conflict decisions under one lock', testRegistrySerializedWritesUseOneLock_);
+}
 
-  QUnit.test('valid processed write commits RECOGNIZED and full cardinality projections', function(assert) {
-    const fixture = createRegistryTestFixture_({ initialized: true });
-    const evidence = createRegistryEvidenceRecord_(1);
-    const processed = createRegistryProcessedDocument_(1, { multiple: true });
-    fixture.registry.persistEvidenceRecord(evidence);
-    assert.deepEqual(fixture.registry.persistProcessedFinancialDocument(processed), processed);
-    assert.deepEqual(fixture.registry.readProcessedFinancialDocument(evidence.evidenceId), processed);
-    assert.equal(activeRegistryRows_(fixture.workbook, 'Evidence').length, 1);
-    assert.equal(activeRegistryRows_(fixture.workbook, '_Canonical').length, 1);
-    assert.equal(activeRegistryRows_(fixture.workbook, 'Documenten').length, 1);
-    assert.equal(activeRegistryRows_(fixture.workbook, 'Regels').length, 2);
-    assert.equal(activeRegistryRows_(fixture.workbook, 'ExtraKosten').length, 2);
-    assert.equal(activeRegistryRows_(fixture.workbook, 'Correcties').length, 2);
-    assert.equal(activeRegistryRows_(fixture.workbook, 'BTW').length, 2);
-    assert.equal(fixture.registry.verifyFinancialDocumentProjections(evidence.evidenceId), true);
-  });
+function registerFinancialDocumentRegistryReadModelsTests_() {
+  QUnit.module('Financial document registry read models');
 
-  QUnit.test('projection builder preserves positions, signed amounts, and blank optionals', function(assert) {
-    const projections = buildFinancialDocumentProjections(createRegistryProcessedDocument_(1, { multiple: true }));
-    assert.deepEqual(projections.Regels.map(function(row) { return row[1]; }), [0, 1]);
-    assert.deepEqual(projections.ExtraKosten.map(function(row) { return row[1]; }), [0, 1]);
-    assert.deepEqual(projections.Correcties.map(function(row) { return row[1]; }), [0, 1]);
-    assert.ok(projections.Correcties[0][4] < 0);
-    assert.equal(projections.BTW[0][3], '');
-    assert.equal(projections.BTW[1][2], '');
-    assert.equal(projections.Regels[1][3], '');
-  });
-
-  QUnit.test('processed exact retry is no-op authority and repairs scoped projection drift', function(assert) {
-    const fixture = createRecognizedRegistryTestFixture_(1, { multiple: true });
-    const originalCanonical = fixture.workbook.rows._Canonical[0].slice();
-    fixture.workbook.rows.Regels.pop();
-    fixture.registry.persistProcessedFinancialDocument(fixture.processed);
-    assert.equal(activeRegistryRows_(fixture.workbook, '_Canonical').length, 1);
-    assert.deepEqual(fixture.workbook.rows._Canonical[0], originalCanonical);
-    assert.equal(activeRegistryRows_(fixture.workbook, 'Regels').length, 2);
-    assert.equal(fixture.registry.verifyFinancialDocumentProjections(fixture.evidence.evidenceId), true);
-  });
-
-  QUnit.test('processed conflicts including changed processedAt never overwrite first commit', function(assert) {
-    ['content', 'time'].forEach(function(kind) {
-      const fixture = createRecognizedRegistryTestFixture_(1, {});
-      const conflict = JSON.parse(JSON.stringify(fixture.processed));
-      if (kind === 'content') conflict.canonicalFinancialDocument.expenses[0].printedLineAmount += 1;
-      if (kind === 'time') conflict.processedAt = '2026-09-13T12:00:00.000Z';
-      assertRegistryError_(assert, function() { fixture.registry.persistProcessedFinancialDocument(conflict); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.duplicateConflict);
-      assert.equal(activeRegistryRows_(fixture.workbook, '_Canonical').length, 1);
-      assert.deepEqual(fixture.registry.readProcessedFinancialDocument(fixture.evidence.evidenceId), fixture.processed);
-    });
-  });
-
-  QUnit.test('corrupt or duplicate Canonical rows fail closed', function(assert) {
-    const corrupt = createRecognizedRegistryTestFixture_(1, {});
-    corrupt.workbook.rows._Canonical[0][3] = '0'.repeat(64);
-    assertRegistryError_(assert, function() { corrupt.registry.readProcessedFinancialDocument(corrupt.evidence.evidenceId); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.corruptRecord);
-
-    const duplicate = createRecognizedRegistryTestFixture_(1, {});
-    duplicate.workbook.rows._Canonical.push(duplicate.workbook.rows._Canonical[0].slice());
-    assertRegistryError_(assert, function() { duplicate.registry.persistProcessedFinancialDocument(duplicate.processed); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.corruptRecord);
-  });
-
-  QUnit.test('unresolved identity remains recognized with blank indexes and outside date query', function(assert) {
-    const fixture = createRecognizedRegistryTestFixture_(1, { unresolved: true });
-    assert.equal(fixture.workbook.rows._Canonical[0][5], '');
-    assert.equal(fixture.workbook.rows._Canonical[0][6], '');
-    assert.equal(fixture.workbook.rows.Documenten[0][1], '');
-    assert.equal(fixture.workbook.rows.Documenten[0][2], '');
-    assert.equal(fixture.registry.queryRecognizedDocumentsByDateRange('2026-01-01', '2026-12-31').length, 0);
-    assert.ok(fixture.registry.readProcessedFinancialDocument(fixture.evidence.evidenceId));
-  });
+  QUnit.test('projection builder preserves positions, signed amounts, and blank optionals', testRegistryProjectionBuilderPreservesValues_);
 
   QUnit.test('projection verification detects missing, duplicate, wrong, extra, and orphan rows', function(assert) {
     const mutations = [
@@ -462,39 +403,124 @@ function registerFinancialDocumentRegistryTests_() {
     fixture.workbook.rows._Canonical[0][5] = '2026-01-01';
     assertRegistryError_(assert, function() { fixture.registry.queryRecognizedDocumentsByDateRange('2026-01-01', '2026-12-31'); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.corruptRecord);
   });
+}
 
-  QUnit.test('serialized writes make exact retry and conflict decisions under one lock', function(assert) {
-    const fixture = createRegistryTestFixture_({ initialized: true });
-    const first = createRegistryEvidenceRecord_(1);
-    fixture.registry.persistEvidenceRecord(first);
-    fixture.registry.persistEvidenceRecord(JSON.parse(JSON.stringify(first)));
-    const conflict = JSON.parse(JSON.stringify(first)); conflict.capturedAt = '2026-09-13T11:00:00.000Z';
-    assertRegistryError_(assert, function() { fixture.registry.persistEvidenceRecord(conflict); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.duplicateConflict);
-    assert.equal(fixture.lock.acquireCount, 3);
-    assert.equal(fixture.lock.releaseCount, 3);
-    assert.deepEqual(fixture.registry.readEvidenceRecord(first.evidenceId), first);
+function testRegistryProjectionBuilderPreservesValues_(assert) {
+  const projections = buildFinancialDocumentProjections(createRegistryProcessedDocument_(1, { multiple: true }));
+  assert.deepEqual(projections.Regels.map(function(row) { return row[1]; }), [0, 1]);
+  assert.deepEqual(projections.ExtraKosten.map(function(row) { return row[1]; }), [0, 1]);
+  assert.deepEqual(projections.Correcties.map(function(row) { return row[1]; }), [0, 1]);
+  assert.ok(projections.Correcties[0][4] < 0);
+  assert.equal(projections.BTW[0][3], '');
+  assert.equal(projections.BTW[1][2], '');
+  assert.equal(projections.Regels[1][3], '');
+}
+
+function testRegistrySerializedWritesUseOneLock_(assert) {
+  const fixture = createRegistryTestFixture_({ initialized: true });
+  const first = createRegistryEvidenceRecord_(1);
+  fixture.registry.persistEvidenceRecord(first);
+  fixture.registry.persistEvidenceRecord(JSON.parse(JSON.stringify(first)));
+  const conflict = JSON.parse(JSON.stringify(first)); conflict.capturedAt = '2026-09-13T11:00:00.000Z';
+  assertRegistryError_(assert, function() { fixture.registry.persistEvidenceRecord(conflict); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.duplicateConflict);
+  assert.equal(fixture.lock.acquireCount, 3);
+  assert.equal(fixture.lock.releaseCount, 3);
+  assert.deepEqual(fixture.registry.readEvidenceRecord(first.evidenceId), first);
+}
+
+function testRegistryErrorsExposeOnlyBoundedMetadata_(assert) {
+  const fixture = createRegistryTestFixture_({ initialized: true });
+  const evidence = createRegistryEvidenceRecord_(1);
+  fixture.registry.persistEvidenceRecord(evidence);
+  const conflict = JSON.parse(JSON.stringify(evidence)); conflict.rawSizeBytes += 1;
+  const error = captureRegistryError_(function() { fixture.registry.persistEvidenceRecord(conflict); });
+  const serialized = JSON.stringify(error);
+  [evidence.sourceFileName, evidence.originRef.fileId, evidence.contentRef.fileId, evidence.sha256, 'base64', 'iban', 'bsn', 'applicantCode'].forEach(function(forbidden) {
+    assert.equal(String(error.message).toLowerCase().indexOf(forbidden.toLowerCase()), -1);
+    assert.equal(serialized.toLowerCase().indexOf(forbidden.toLowerCase()), -1);
   });
+  assert.equal(error.evidenceId, evidence.evidenceId);
+}
 
-  QUnit.test('registry errors expose only bounded metadata and no restricted payload values', function(assert) {
+function testRegistryConfigurationFailuresUseBoundedErrors_(assert) {
+  assertRegistryError_(assert, function() { createFinancialDocumentRegistry({}); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.configuration);
+  const fixture = createRegistryTestFixture_({ initialized: true });
+  fixture.dependencies.configuration.getRegistrySpreadsheetId = function() { return ''; };
+  assertRegistryError_(assert, function() { fixture.registry.readEvidenceRecord(registryEvidenceId_(1)); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.configuration);
+}
+
+function testRegistryProcessedPersistenceRequiresEvidenceAndProvenance_(assert) {
+  const missing = createRegistryTestFixture_({ initialized: true });
+  assertRegistryError_(assert, function() { missing.registry.persistProcessedFinancialDocument(createRegistryProcessedDocument_(1, {})); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.missingEvidence);
+
+  ['sourceFileName', 'mimeType'].forEach(function(fieldName) {
     const fixture = createRegistryTestFixture_({ initialized: true });
     const evidence = createRegistryEvidenceRecord_(1);
     fixture.registry.persistEvidenceRecord(evidence);
-    const conflict = JSON.parse(JSON.stringify(evidence)); conflict.rawSizeBytes += 1;
-    const error = captureRegistryError_(function() { fixture.registry.persistEvidenceRecord(conflict); });
-    const serialized = JSON.stringify(error);
-    [evidence.sourceFileName, evidence.originRef.fileId, evidence.contentRef.fileId, evidence.sha256, 'base64', 'iban', 'bsn', 'applicantCode'].forEach(function(forbidden) {
-      assert.equal(String(error.message).toLowerCase().indexOf(forbidden.toLowerCase()), -1);
-      assert.equal(serialized.toLowerCase().indexOf(forbidden.toLowerCase()), -1);
-    });
-    assert.equal(error.evidenceId, evidence.evidenceId);
+    const processed = createRegistryProcessedDocument_(1, {});
+    processed.canonicalFinancialDocument.sourceProvenance[fieldName] = fieldName === 'mimeType' ? 'image/png' : 'different.pdf';
+    assertRegistryError_(assert, function() { fixture.registry.persistProcessedFinancialDocument(processed); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.validation);
   });
+}
 
-  QUnit.test('configuration and workbook adapter failures use bounded registry errors', function(assert) {
-    assertRegistryError_(assert, function() { createFinancialDocumentRegistry({}); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.configuration);
-    const fixture = createRegistryTestFixture_({ initialized: true });
-    fixture.dependencies.configuration.getRegistrySpreadsheetId = function() { return ''; };
-    assertRegistryError_(assert, function() { fixture.registry.readEvidenceRecord(registryEvidenceId_(1)); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.configuration);
+function testRegistryValidProcessedWriteCommitsRecognizedDocument_(assert) {
+  const fixture = createRegistryTestFixture_({ initialized: true });
+  const evidence = createRegistryEvidenceRecord_(1);
+  const processed = createRegistryProcessedDocument_(1, { multiple: true });
+  fixture.registry.persistEvidenceRecord(evidence);
+  assert.deepEqual(fixture.registry.persistProcessedFinancialDocument(processed), processed);
+  assert.deepEqual(fixture.registry.readProcessedFinancialDocument(evidence.evidenceId), processed);
+  assert.equal(activeRegistryRows_(fixture.workbook, 'Evidence').length, 1);
+  assert.equal(activeRegistryRows_(fixture.workbook, '_Canonical').length, 1);
+  assert.equal(activeRegistryRows_(fixture.workbook, 'Documenten').length, 1);
+  assert.equal(activeRegistryRows_(fixture.workbook, 'Regels').length, 2);
+  assert.equal(activeRegistryRows_(fixture.workbook, 'ExtraKosten').length, 2);
+  assert.equal(activeRegistryRows_(fixture.workbook, 'Correcties').length, 2);
+  assert.equal(activeRegistryRows_(fixture.workbook, 'BTW').length, 2);
+  assert.equal(fixture.registry.verifyFinancialDocumentProjections(evidence.evidenceId), true);
+}
+
+function testRegistryProcessedRetryRepairsProjectionDrift_(assert) {
+  const fixture = createRecognizedRegistryTestFixture_(1, { multiple: true });
+  const originalCanonical = fixture.workbook.rows._Canonical[0].slice();
+  fixture.workbook.rows.Regels.pop();
+  fixture.registry.persistProcessedFinancialDocument(fixture.processed);
+  assert.equal(activeRegistryRows_(fixture.workbook, '_Canonical').length, 1);
+  assert.deepEqual(fixture.workbook.rows._Canonical[0], originalCanonical);
+  assert.equal(activeRegistryRows_(fixture.workbook, 'Regels').length, 2);
+  assert.equal(fixture.registry.verifyFinancialDocumentProjections(fixture.evidence.evidenceId), true);
+}
+
+function testRegistryProcessedConflictsNeverOverwriteFirstCommit_(assert) {
+  ['content', 'time'].forEach(function(kind) {
+    const fixture = createRecognizedRegistryTestFixture_(1, {});
+    const conflict = JSON.parse(JSON.stringify(fixture.processed));
+    if (kind === 'content') conflict.canonicalFinancialDocument.expenses[0].printedLineAmount += 1;
+    if (kind === 'time') conflict.processedAt = '2026-09-13T12:00:00.000Z';
+    assertRegistryError_(assert, function() { fixture.registry.persistProcessedFinancialDocument(conflict); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.duplicateConflict);
+    assert.equal(activeRegistryRows_(fixture.workbook, '_Canonical').length, 1);
+    assert.deepEqual(fixture.registry.readProcessedFinancialDocument(fixture.evidence.evidenceId), fixture.processed);
   });
+}
+
+function testRegistryCorruptOrDuplicateCanonicalRowsFailClosed_(assert) {
+  const corrupt = createRecognizedRegistryTestFixture_(1, {});
+  corrupt.workbook.rows._Canonical[0][3] = '0'.repeat(64);
+  assertRegistryError_(assert, function() { corrupt.registry.readProcessedFinancialDocument(corrupt.evidence.evidenceId); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.corruptRecord);
+
+  const duplicate = createRecognizedRegistryTestFixture_(1, {});
+  duplicate.workbook.rows._Canonical.push(duplicate.workbook.rows._Canonical[0].slice());
+  assertRegistryError_(assert, function() { duplicate.registry.persistProcessedFinancialDocument(duplicate.processed); }, FINANCIAL_DOCUMENT_REGISTRY_ERROR_CODES.corruptRecord);
+}
+
+function testRegistryUnresolvedIdentityRemainsRecognized_(assert) {
+  const fixture = createRecognizedRegistryTestFixture_(1, { unresolved: true });
+  assert.equal(fixture.workbook.rows._Canonical[0][5], '');
+  assert.equal(fixture.workbook.rows._Canonical[0][6], '');
+  assert.equal(fixture.workbook.rows.Documenten[0][1], '');
+  assert.equal(fixture.workbook.rows.Documenten[0][2], '');
+  assert.equal(fixture.registry.queryRecognizedDocumentsByDateRange('2026-01-01', '2026-12-31').length, 0);
+  assert.ok(fixture.registry.readProcessedFinancialDocument(fixture.evidence.evidenceId));
 }
 
 function createRegistryTestFixture_(options) {

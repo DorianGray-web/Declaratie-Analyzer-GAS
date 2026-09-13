@@ -32,8 +32,20 @@ const QUNIT_TEST_REGISTRATIONS = Object.freeze([
     register: function() { registerProcessedFinancialDocumentTests_(); }
   }),
   Object.freeze({
-    id: 'financial-document-registry-tests',
-    register: function() { registerFinancialDocumentRegistryTests_(); }
+    id: 'financial-document-registry-foundation-tests',
+    register: function() { registerFinancialDocumentRegistryFoundationTests_(); }
+  }),
+  Object.freeze({
+    id: 'financial-document-registry-serialization-tests',
+    register: function() { registerFinancialDocumentRegistrySerializationTests_(); }
+  }),
+  Object.freeze({
+    id: 'financial-document-registry-persistence-tests',
+    register: function() { registerFinancialDocumentRegistryPersistenceTests_(); }
+  }),
+  Object.freeze({
+    id: 'financial-document-registry-read-models-tests',
+    register: function() { registerFinancialDocumentRegistryReadModelsTests_(); }
   })
 ]);
 
@@ -45,7 +57,10 @@ const QUNIT_AUTHORITATIVE_GAS_BATCHES = Object.freeze([
   Object.freeze({ selector: 'drive-evidence-store', registrationIds: Object.freeze(['drive-evidence-store-tests']) }),
   Object.freeze({ selector: 'test-harness', registrationIds: Object.freeze(['test-harness-tests']) }),
   Object.freeze({ selector: 'processed-financial-document', registrationIds: Object.freeze(['processed-financial-document-tests']) }),
-  Object.freeze({ selector: 'financial-document-registry', registrationIds: Object.freeze(['financial-document-registry-tests']) })
+  Object.freeze({ selector: 'financial-document-registry-foundation', registrationIds: Object.freeze(['financial-document-registry-foundation-tests']) }),
+  Object.freeze({ selector: 'financial-document-registry-serialization', registrationIds: Object.freeze(['financial-document-registry-serialization-tests']) }),
+  Object.freeze({ selector: 'financial-document-registry-persistence', registrationIds: Object.freeze(['financial-document-registry-persistence-tests']) }),
+  Object.freeze({ selector: 'financial-document-registry-read-models', registrationIds: Object.freeze(['financial-document-registry-read-models-tests']) })
 ]);
 
 const QUNIT_TEST_HARNESS_ERROR_CODES = Object.freeze({
@@ -60,6 +75,12 @@ function doGet(event) {
   registerQUnitTestPlan_(plan);
   QUnit.start();
   return QUnitGS2.getHtml();
+}
+
+// QUnitGS2's rendered web app calls this project-global bridge to retrieve the
+// server-side results cached by init() callbacks after QUnit.start().
+function getResultsFromServer() {
+  return QUnitGS2.getResultsFromServer();
 }
 
 function registerSourceIngestionTests_() {

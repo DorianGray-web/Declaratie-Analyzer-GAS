@@ -73,7 +73,10 @@ lifecycles. Invoke the deployed test web app once for each selector:
 - `?batch=drive-evidence-store`
 - `?batch=test-harness`
 - `?batch=processed-financial-document`
-- `?batch=financial-document-registry`
+- `?batch=financial-document-registry-foundation`
+- `?batch=financial-document-registry-serialization`
+- `?batch=financial-document-registry-persistence`
+- `?batch=financial-document-registry-read-models`
 
 Each request initializes QUnitGS2 and registers only its selected test module.
 An unknown, retired, or explicitly empty selector fails closed instead of running
@@ -84,6 +87,9 @@ QUnit-compatible runners and as a legacy full-suite diagnostic. That monolithic
 route is not an authoritative GAS regression gate. The repository currently has
 no checked-in command-line runner; local harness results and declared structure
 do not prove completion of the real GAS reporter lifecycle.
+
+The former combined `?batch=financial-document-registry` selector is retired
+and now fails closed as an unknown selector.
 
 No numeric test, assertion, or payload limit is assumed. See
 [LESSONS_LEARNED.md](LESSONS_LEARNED.md)
