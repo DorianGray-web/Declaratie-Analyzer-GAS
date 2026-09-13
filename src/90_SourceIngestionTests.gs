@@ -148,6 +148,7 @@ function doGet() {
   registerRawDocumentExtractionTests_();
   registerCanonicalFinancialDocumentTests_();
   registerEvidenceRecordTests_();
+  registerDriveEvidenceStoreTests_();
 
   QUnit.start();
   return QUnitGS2.getHtml();
