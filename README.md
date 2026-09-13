@@ -72,6 +72,7 @@ lifecycles. Invoke the deployed test web app once for each selector:
 - `?batch=evidence-record`
 - `?batch=drive-evidence-store`
 - `?batch=test-harness`
+- `?batch=processed-financial-document`
 
 Each request initializes QUnitGS2 and registers only its selected test module.
 An unknown, retired, or explicitly empty selector fails closed instead of running
